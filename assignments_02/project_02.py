@@ -110,12 +110,13 @@ print(correlations)
 
 # Which feature has the strongest relationship with G3? Are any results surprising?
 # The strongest relationship with G3 has:
-# studytime     0.126728
+# failures     -0.293831
+# absences     -0.213129
+# ...
 # Fedu          0.158811
 # Medu          0.190308
-# G1            0.891805
-# G2            0.965583
-# The most surprising were parents' education.
+# The strongest relationship with G3 has failures (with -0.294) and absences (-0.213).
+# The most surprising were parents' education (Fedu = 0.16, Medu = 0.19).
 
 # Then create at least two visualizations of your own choosing and save them to outputs/.
 # Use your judgment from previous weeks of data engineering to guide your use of plots.
@@ -278,6 +279,8 @@ high_band_mae = abs(y_test_full[high_band] - y_pred_full[high_band]).mean() if h
 # Task 6 - Error by grade band (MAE):
 # Low-end MAE (actual <= 8): 3.892
 # High-end MAE (actual >= 14): 3.023
+# As we have low-end MAE bigger than high-end MAE, the model struggles more at the low end
+# So, it seems to over-predict grades for the weakest students
 
 # Then write a plain-language summary in your comments statements covering:
 # The size of the filtered dataset and the test set
