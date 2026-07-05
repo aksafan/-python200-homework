@@ -123,6 +123,7 @@ def describe_and_plot(df: pd.DataFrame):
     logger = get_run_logger()
 
     output_dir = Path('outputs')
+    output_dir.mkdir(exist_ok=True)
 
     plot_df = df.copy()
 

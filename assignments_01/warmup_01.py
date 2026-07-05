@@ -18,6 +18,9 @@ data = {
 df = pd.DataFrame(data)
 
 print(f"Num Rows: {len(df)}")
+print(f"First three rows: \n{df.head(3)}")
+print(f"Shape: {df.shape}")
+print(f"Data types: \n{df.dtypes}")
 
 # Pandas Question 2
 # Using the DataFrame from Q1, filter the rows to show only students who passed and have a grade above 80. Print the result.
@@ -116,6 +119,8 @@ x1, y1 = [1, 2, 3, 4, 5], [2, 4, 5, 4, 5]
 x2, y2 = [1, 2, 3, 4, 5], [5, 4, 3, 2, 1]
 plt.scatter(x1, y1, color='yellow', label = 'Dataset 1')
 plt.scatter(x2, y2, color='blue', label = 'Dataset 2')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
 plt.title('Dataset 1 vs Dataset 2')
 plt.legend()
 plt.show()
@@ -179,7 +184,9 @@ skewed_data = np.random.exponential(10, 200)
 plt.boxplot([normal_data, skewed_data], tick_labels=['Normal', 'Exponential'])
 plt.title("Distribution Comparison")
 plt.show()
-# Exponential distribution is more skewed. For the normal distribution - the mean will would be a more appropriate measure. For the exponential distribution - the mean will would be a more appropriate measure.
+# Exponential distribution is more skewed.
+# For the normal distribution - the mean would be a more appropriate measure.
+# For the exponential distribution - the median would be a more appropriate measure.
 
 # Descriptive Stats Question 5
 # Print the mean, median, and mode of the following:
@@ -224,7 +231,7 @@ print(f"One-sample t-test. T-statistic: {t_stat}, P-value: {p_val}")
 
 # Hypothesis Question 5
 # Re-run the test from Q1 as a one-tailed test to check whether group_a scores are less than group_b scores. Print the resulting p-value. Use the alternative parameter.
-t_stat, p_val  = stats.ttest_ind(before, after, alternative='less')
+t_stat, p_val  = stats.ttest_ind(group_a, group_b, alternative='less')
 print(f"One-tailed t-test (whether group_a scores are less than group_b scores). T-statistic: {t_stat}, P-value: {p_val}")
 
 # Hypothesis Question 6

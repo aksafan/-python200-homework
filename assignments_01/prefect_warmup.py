@@ -30,9 +30,7 @@ def create_series(arr):
 
 @task
 def clean_data(series):
-    series.dropna()
-
-    return series
+    return series.dropna()
 
 @task
 def summarize_data(series):
