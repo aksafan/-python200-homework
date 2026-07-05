@@ -4,3 +4,4 @@ matplotlib
 scipy
 seaborn
 prefect
+scikit-learn
