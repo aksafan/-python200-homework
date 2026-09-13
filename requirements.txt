@@ -6,3 +6,7 @@ seaborn
 prefect
 scikit-learn
 openai
+pypdf
+python-dotenv
+llama-index-core==0.14.24
+llama-index-embeddings-openai
