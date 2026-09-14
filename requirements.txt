@@ -10,3 +10,5 @@ pypdf
 python-dotenv
 llama-index-core==0.14.24
 llama-index-embeddings-openai
+llama-index-readers-file
+llama-index-llms-openai
