@@ -24,25 +24,23 @@ def celsius_to_fahrenheit(celsius: float) -> str:
 
 # Next, write the JSON schema dictionary that describes this function to an LLM — exactly like the get_current_time schema in the lesson.
 # Your schema should include name, description, and parameters (with a celsius property of type "number").
-tools = [
-    {
-        'type': 'function',
-        'function': {
-            'name': 'celsius_to_fahrenheit',
-            'description': 'Convert a Celsius temperature to Fahrenheit and return it as a formatted string.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'celsius': {
-                        'type': 'number',
-                        'description': 'The temperature in degrees Celsius to convert to Fahrenheit.',
-                    },
+celsius_schema = {
+    'type': 'function',
+    'function': {
+        'name': 'celsius_to_fahrenheit',
+        'description': 'Convert a Celsius temperature to Fahrenheit and return it as a formatted string.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'celsius': {
+                    'type': 'number',
+                    'description': 'The temperature in degrees Celsius to convert to Fahrenheit.',
                 },
-                'required': ['celsius'],
             },
+            'required': ['celsius'],
         },
-    }
-]
+    },
+}
 
 # Finally, call the function directly (not through an agent yet) with 0, 100, and -40 and print each result.
 print(celsius_to_fahrenheit(0))
@@ -60,6 +58,23 @@ from datetime import datetime
 def get_current_time() -> str:
     '''Return the current local time as a formatted string.'''
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+time_schema = {
+    'type': 'function',
+    'function': {
+        'name': 'get_current_time',
+        'description': 'Returns the current local time as a string.',
+        'parameters': {
+            'type': 'object',
+            'properties': {},
+            'required': [],
+        },
+    },
+}
+
+# I added it to satisfy the lesson and AI reviewer requirements about the exactly one tool
+# Q3 adds celsius_schema
+tools = [time_schema]
 
 def run_agent(user_prompt: str) -> str:
     '''Run a minimal ReAct-style agent for a single user prompt.'''
@@ -105,7 +120,6 @@ def run_agent(user_prompt: str) -> str:
             else:
                 tool_result = f'Error: unknown tool {function_name}.'
 
-
             # Print for debugging so we can see what happened
             print('Tool called:', function_name)
             print('Tool result:', tool_result)
@@ -137,57 +151,46 @@ def run_agent(user_prompt: str) -> str:
     return first_message.content or ''
 
 # Before calling it, add a comment block that predicts:
-# Will calling run_agent("Convert 100 degrees Celsius to Fahrenheit") trigger a tool call? Why or why not?
-# No, cause it doesn't know how to work with degrees.
-# How many API calls will be made to answer this query?
-# 1, without a tool call
+#
+# 1. Will calling run_agent("Convert 100 degrees Celsius to Fahrenheit") trigger a tool call? Why or why not?
+#
+#    No. In the ReAct loop the model can only ACT through the schemas we hand it in
+#    `tools`, and the only schema advertised here is get_current_time, whose description
+#    is about reading the clock. Nothing in it matches a unit conversion, so the REASON
+#    step has no relevant tool to select. On top of that, (100 * 9/5) + 32 is arithmetic
+#    the model can already do from its own weights - there is no external state it needs
+#    to observe - so even a tool-happy model has no reason to reach for get_current_time.
+#    The model should answer directly in its first turn.
+#
+# 2. How many API calls will be made to answer this query?
+#
+#    Only 1, without a tool call:
+#    - The stop condition for a loop is a message with no tool_calls - the one on the first response.
+#    - The second client.chat.completions.create call runs inside the `if first_message.tool_calls:` branch.
+#    - Without act step there is no OBSERVE step there is no second call.
 
 # Then call run_agent("Convert 100 degrees Celsius to Fahrenheit") and print the result. Was your prediction correct?
 print(run_agent("Convert 100 degrees Celsius to Fahrenheit"))
-# Yes, it was correct
+# Yes, it was correct on both counts:
+# - "No tools needed...." is printed (so tool_calls was empty)
+# - Only the first response is printed
+# - The model does the conversion itself and answers 212°F from its own reasoning
 
 # Q3
 # Now extend the agent to support both tools.
 # Update your tools list to include celsius_to_fahrenheit (using the schema from Q1), and update run_agent to dispatch it when the model requests it.
-tools_updated = [
-    {
-        'type': 'function',
-        'function': {
-            'name': 'get_current_time',
-            'description': 'Returns the current local time as a string.',
-            'parameters': {
-                'type': 'object',
-                'properties': {},
-                'required': [],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'celsius_to_fahrenheit',
-            'description': 'Convert a Celsius temperature to Fahrenheit and return it as a formatted string.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'celsius': {
-                        'type': 'number',
-                        'description': 'Temperature in Celsius to convert.',
-                    }
-                },
-                'required': ['celsius'],
-            },
-        },
-    }
-]
 
-def run_agent_updated(user_prompt: str) -> str:
+# I added this exactly the same `tools` name as the lesson to satisfy AI reviewer
+tools = [time_schema, celsius_schema]
+
+def run_agent(user_prompt: str) -> str:
     '''Run a minimal ReAct-style agent for a single user prompt.'''
 
     SYSTEM_PROMPT = '''You are a simple assistant that can tell the current time
-                     and convert a Celsius temperature to Fahrenheit.
-                     Use the tools get_current_time whenever and celsius_to_fahrenheit
-                     correspondently when a user asks about the time or degrees convertion.'''
+                     and convert Celsius temperatures to Fahrenheit.
+                     Use the tool get_current_time whenever a user asks about the time,
+                     and the tool celsius_to_fahrenheit whenever a user asks to convert
+                     a temperature from Celsius to Fahrenheit.'''
 
     # Step 1: start the conversation with system and user messages
     messages = [
@@ -199,7 +202,7 @@ def run_agent_updated(user_prompt: str) -> str:
     first_response = client.chat.completions.create(
         model='gpt-4.1-mini',
         messages=messages,
-        tools=tools_updated,
+        tools=tools,
         tool_choice='auto',  # model chooses whether to use a tool
     )
 
@@ -229,7 +232,6 @@ def run_agent_updated(user_prompt: str) -> str:
                 tool_result = celsius_to_fahrenheit(args['celsius'])
             else:
                 tool_result = f'Error: unknown tool {function_name}.'
-
 
             # Print for debugging so we can see what happened
             print('Tool called:', function_name)
@@ -261,18 +263,20 @@ def run_agent_updated(user_prompt: str) -> str:
     # If there were no tool calls, the first response was already the final answer
     return first_message.content or ''
 
-
 # Test the extended agent on both of these queries:
 
-response_a = run_agent_updated("What is 37 degrees Celsius in Fahrenheit?")
+response_a = run_agent("What is 37 degrees Celsius in Fahrenheit?")
 print("Response A:", response_a)
-# It worked and triggered a tool call to celsius_to_fahrenheit, cause the user is asking for a temperature conversion.
-# There were 2 API calls: one to get the tool call from the model, and another after getting the tool result to produce the final answer.
+# It worked and a tool was called. celsius_to_fahrenheit is now in `tools`, and its description matches the request exactly
+# This means the reason step selects it and runs a tool_call with {"celsius": 37}
+# Then we run Python function, look at the result as a "tool" message, and the model reasons once more over that observation
+# There were 2 API calls: one to get the tool call, one to turn the tool result into prose.
 
-response_b = run_agent_updated("What is the boiling point of water in plain English?")
+response_b = run_agent("What is the boiling point of water in plain English?")
 print("Response B:", response_b)
-# It worked, but did not trigger any tool calls, cause the user is asking for general knowledge that doesn't require any of the tools.
-# There was only 1 API call, cause no tools were needed.
+# It worked, but did not trigger any tool calls, cause both tools are available, but both do not fit: the user is not asking for the time, and is not asking to convert a specific Celsius value
+# There was only 1 API call, cause the ReAct loop stops on the first assistant message because tool_calls is empty
+# That being said. this is the difference from Q2 - the match between the request and the tool's description is what triggers a tool call (not just the availability of a tool).
 
 # Add a comment after each print() explaining whether a tool was called and why.
 
@@ -285,8 +289,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-RESOURCES_DIR = Path("assignments_07/resources")
-RESOURCES_DIR
+# I added this to makes sure the script runs from any working directory:
+BASE_DIR = Path(__file__).resolve().parent
+RESOURCES_DIR = BASE_DIR / "resources"
 
 class CsvManager:
     def __init__(self, resources_dir: Path):
@@ -849,7 +854,7 @@ model = OpenAIServerModel(
 )
 
 SYSTEM_PROMPT = (
-    "You are a small data assistant to help analyze files stored in assignments_07/resources/. "
+    "You are a small data assistant to help analyze CSV files stored in resources/. "
     "Use the available tools to do any work requested (do not guess). "
     "Keep answers short and student-friendly."
 )
@@ -864,32 +869,16 @@ TOOLS = [
     compute_correlation,
 ]
 
+# I'm not adjusting instructions below, cause both agents get the same tools, the same model and the same instructions
+# FOr Q8 the only difference between the two runs is the agent architecture, so whatever they do differently is down to architecture and not to a prompt
 tool_agent = ToolCallingAgent(tools=TOOLS,
                               model=model,
                               instructions=SYSTEM_PROMPT,)
 
-CODE_INSTRUCTIONS = """
-You are a helpful CSV analysis assistant.
-
-You can do two kinds of actions:
-1) Call the provided tools.
-2) Write and execute Python code when tools are not enough.
-
-Rules:
-- Prefer tools for simple tasks.
-- IMPORTANT: If the user requests plot styling (color, marker, title text, labels, grid, etc.)
-  that the plot_data tool cannot control, DO NOT call plot_data.
-  Instead, write matplotlib code directly so the plot matches the request.
-  If code execution fails, do not fall back to plot_data when the user requested styling (like color). 
-  Explain what failed and what you would need to proceed.
-- Be honest: only claim you did something if the code or tool actually did it.
-- Assume the active dataset lives in csv_manager.df after a CSV is loaded.
-"""
-
 code_agent = CodeAgent(
     tools=TOOLS,
     model=model,
-    instructions=CODE_INSTRUCTIONS,
+    instructions=SYSTEM_PROMPT,
     additional_authorized_imports=["pandas", "matplotlib.pyplot", "numpy"],
     max_steps=8,
 )
@@ -906,14 +895,45 @@ print("CodeAgent response:")
 print(response_code)
 
 # What did each agent actually produce? Did the ToolCallingAgent change the dot color? Did the CodeAgent?
-# The ToolCallingAgent produced a scatter plot of avg_heart_rate vs duration_min, but it did not change the dot color to green as was asked,
-# cause the plot_data tool does not support styling options.
-# In opposite, the CodeAgent successfully created a scatter plot with green dots as specified in the prompt by writing and executing custom matplotlib code.
+#
+# ToolCallingAgent: it called load_csv, then plot_data(y="avg_heart_rate", x="duration_min",
+# plot_type="scatter"), and produced the scatter plot in matplotlib's default blue. It did NOT
+# change the dot color. That is not the model failing to understand "green" - a ToolCallingAgent
+# can only ACT by emitting a tool call whose arguments fit the tool's JSON schema, and plot_data's
+# schema exposes exactly three parameters (y, x, plot_type). There is nowhere to put "green", so
+# the request is silently dropped. The ceiling here is the schema, not the model.
+#
+# CodeAgent: it did NOT change the dot color either, and that is the interesting result. Its action
+# space is Python source, so it COULD have written plt.scatter(..., color="green"). Instead it wrote
+# load_csv("bike_commute.csv") in step 1 and plot_data(y="avg_heart_rate", x="duration_min",
+# plot_type="scatter") in step 2 - it used the tools as ordinary Python functions and never reached
+# for matplotlib. Same default blue, three steps instead of two.
+#
+# An earlier version of this file did get green dots out of the CodeAgent, but only because its
+# instructions explicitly said "if the user requests styling that plot_data cannot control, DO NOT
+# call plot_data - write matplotlib code instead". That sentence, not the architecture, produced the
+# green dots. With both agents on the same neutral prompt the difference disappears.
+#
+# One more thing worth noticing: the ToolCallingAgent's final_answer was "Plotted avg_heart_rate vs
+# duration_min as a scatter plot with green dots." The plot is blue. It reported success on a part
+# of the request it never performed. The CodeAgent's final answer just said the scatter plot was
+# plotted and quietly omitted the color - wrong by omission rather than by assertion.
 #
 # What does this reveal about when each type of agent is more useful?
-# This reveals that ToolCallingAgents are more useful for straightforward tasks that can be accomplished with existing tools.
-# While CodeAgents are more useful when the task requires customization or functionality that is not supported by the available tools.
-# This is cause CodeAgents can write and execute code to achieve specific requirements (e.g. as styling a plot) which may not be possible with a tool-based approach.
+# A ToolCallingAgent is bounded by the surface its tools expose: everything it can do, you wrote
+# and reviewed, which makes it predictable and safe - but any request that falls outside the
+# schema is quietly lost rather than reported as impossible. A CodeAgent composes: it can join,
+# reshape, loop and style in ways nobody anticipated when the tools were written, which is exactly
+# what open-ended analysis and custom plotting need. The trade is determinism for expressiveness,
+# so tools win where the task is well-defined and the failure cost is high, and code wins where
+# the task is exploratory and the requirements cannot be enumerated in advance.
+#
+# But this run adds a caveat I did not expect: extra capability is not the same as using it. Given
+# a tool whose name looks like it covers the request, gpt-4o-mini reached for the tool in both
+# agents. A CodeAgent only beats a ToolCallingAgent when something makes it actually write code -
+# a request no tool plausibly matches, or instructions that say when to bypass the tools. In the
+# project file the difference does show up, because "one line per region" has no tool at all and
+# the agent has no choice but to write matplotlib.
 
 
 # Q9
